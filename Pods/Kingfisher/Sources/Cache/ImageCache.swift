@@ -193,30 +193,11 @@ open class ImageCache {
         }
     }
     
-    /// Creates an `ImageCache` with a given `name`. Both `MemoryStorage` and `DiskStorage` will be created
-    /// with a default config based on the `name`.
-    ///
-    /// - Parameter name: The name of cache object. It is used to setup disk cache directories and IO queue.
-    ///                   You should not use the same `name` for different caches, otherwise, the disk storage would
-    ///                   be conflicting to each other. The `name` should not be an empty string.
     public convenience init(name: String) {
         try! self.init(name: name, cacheDirectoryURL: nil, diskCachePathClosure: nil)
     }
-
-    /// Creates an `ImageCache` with a given `name`, cache directory `path`
-    /// and a closure to modify the cache directory.
-    ///
-    /// - Parameters:
-    ///   - name: The name of cache object. It is used to setup disk cache directories and IO queue.
-    ///           You should not use the same `name` for different caches, otherwise, the disk storage would
-    ///           be conflicting to each other.
-    ///   - cacheDirectoryURL: Location of cache directory URL on disk. It will be internally pass to the
-    ///                        initializer of `DiskStorage` as the disk cache directory. If `nil`, the cache
-    ///                        directory under user domain mask will be used.
-    ///   - diskCachePathClosure: Closure that takes in an optional initial path string and generates
-    ///                           the final disk cache path. You could use it to fully customize your cache path.
-    /// - Throws: An error that happens during image cache creating, such as unable to create a directory at the given
-    ///           path.
+    
+    // diskCachePathClosure是用来组装最终硬盘缓存路径的block
     public convenience init(
         name: String,
         cacheDirectoryURL: URL?,
@@ -226,7 +207,7 @@ open class ImageCache {
             fatalError("[Kingfisher] You should specify a name for the cache. A cache with empty name is not permitted.")
         }
 
-        let totalMemory = ProcessInfo.processInfo.physicalMemory
+        let totalMemory = ProcessInfo.processInfo.physicalMemory // 获取当前进程的存储空间
         let costLimit = totalMemory / 4
         let memoryStorage = MemoryStorage.Backend<Image>(config:
             .init(totalCostLimit: (costLimit > Int.max) ? Int.max : Int(costLimit)))
@@ -249,8 +230,7 @@ open class ImageCache {
         NotificationCenter.default.removeObserver(self)
     }
 
-    // MARK: Storing Images
-
+    // 存储图片
     open func store(_ image: Image,
                     original: Data? = nil,
                     forKey key: String,
