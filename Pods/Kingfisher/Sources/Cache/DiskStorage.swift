@@ -167,6 +167,7 @@ public enum DiskStorage {
             try removeFile(at: fileURL)
         }
 
+        // 直接使用FileManager移除文件或者目录
         func removeFile(at url: URL) throws {
             try config.fileManager.removeItem(at: url)
         }
@@ -206,6 +207,7 @@ public enum DiskStorage {
             }
         }
 
+        // 根据指定的文件属性key获取缓存目录的所有文件URL
         func allFileURLs(for propertyKeys: [URLResourceKey]) throws -> [URL] {
             let fileManager = config.fileManager
 
@@ -222,34 +224,39 @@ public enum DiskStorage {
             return urls
         }
 
+        // 移除过期的文件
         func removeExpiredValues(referenceDate: Date = Date()) throws -> [URL] {
             let propertyKeys: [URLResourceKey] = [
-                .isDirectoryKey,
-                .contentModificationDateKey
+                .isDirectoryKey, // 表示是否是目录
+                .contentModificationDateKey // 文件最近更改的时间
             ]
 
             let urls = try allFileURLs(for: propertyKeys)
             let keys = Set(propertyKeys)
             let expiredFiles = urls.filter { fileURL in
                 do {
+                    // 获取文件的一些基本信息
                     let meta = try FileMeta(fileURL: fileURL, resourceKeys: keys)
                     if meta.isDirectory {
                         return false
                     }
+                    // 判断文件是否过期，这里默认是和当前时间比较
                     return meta.expired(referenceDate: referenceDate)
                 } catch {
                     return true
                 }
             }
+            
             try expiredFiles.forEach { url in
                 try removeFile(at: url)
             }
             return expiredFiles
         }
 
+        // 移除大小超过限制的文件
         func removeSizeExceededValues() throws -> [URL] {
 
-            if config.sizeLimit == 0 { return [] } // Back compatible. 0 means no limit.
+            if config.sizeLimit == 0 { return [] } // sizeLimit=0表示没有限制
 
             var size = try totalSize()
             if size < config.sizeLimit { return [] }
@@ -262,16 +269,21 @@ public enum DiskStorage {
             let keys = Set(propertyKeys)
 
             let urls = try allFileURLs(for: propertyKeys)
+            
+            // compactMap会将nil排除在外, compact：紧凑的
             var pendings: [FileMeta] = urls.compactMap { fileURL in
                 guard let meta = try? FileMeta(fileURL: fileURL, resourceKeys: keys) else {
                     return nil
                 }
                 return meta
             }
-            // Sort by last access date. Most recent file first.
+            
+            // 对文件进行排序；lastAccessDate方法定义了文件日期比较的规则
             pendings.sort(by: FileMeta.lastAccessDate)
 
             var removed: [URL] = []
+            
+            // 将缓存大小降到指定缓存大小的一半
             let target = config.sizeLimit / 2
             while size > target, let meta = pendings.popLast() {
                 size -= UInt(meta.fileSize)
@@ -281,7 +293,7 @@ public enum DiskStorage {
             return removed
         }
 
-        /// Get the total file size of the folder in bytes.
+        // 获取缓存的文件的总大小，单位是byte
         func totalSize() throws -> UInt {
             let propertyKeys: [URLResourceKey] = [.fileSizeKey]
             let urls = try allFileURLs(for: propertyKeys)
@@ -335,6 +347,9 @@ extension DiskStorage {
 }
 
 extension DiskStorage {
+    
+    // 获取文件的创建时间，最近修改时间等
+    // 设置新的过期时间等等操作
     struct FileMeta {
     
         let url: URL
@@ -386,7 +401,7 @@ extension DiskStorage {
             let originalExpiration: StorageExpiration =
                 .seconds(lastEstimatedExpiration.timeIntervalSince(lastAccessDate))
             let attributes: [FileAttributeKey : Any] = [
-                .creationDate: Date().fileAttributeDate,
+                .creationDate: Date().fileAttributeDate, // fileAttributeDate会对日期做向上取整
                 .modificationDate: originalExpiration.estimatedExpirationSinceNow.fileAttributeDate
             ]
 
